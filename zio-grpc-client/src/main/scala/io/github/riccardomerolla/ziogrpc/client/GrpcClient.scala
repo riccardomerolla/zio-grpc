@@ -37,11 +37,16 @@ final case class GrpcClient(channel: GrpcChannel):
         )
       )
       .mapError {
-        case exception: StatusException =>
+        case exception: StatusException                =>
           GrpcStatusInterop
             .fromStatus(exception.getStatus)
             .map(ClientError.Remote(_))
             .getOrElse(ClientError.Transport(exception.getStatus))
-        case other                      =>
+        case exception: io.grpc.StatusRuntimeException =>
+          GrpcStatusInterop
+            .fromStatus(exception.getStatus)
+            .map(ClientError.Remote(_))
+            .getOrElse(ClientError.Transport(exception.getStatus))
+        case other                                     =>
           ClientError.CallFailure(Option(other.getMessage).getOrElse(other.toString))
       }

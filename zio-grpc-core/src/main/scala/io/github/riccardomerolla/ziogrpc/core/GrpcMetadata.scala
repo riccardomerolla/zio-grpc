@@ -1,6 +1,7 @@
 package io.github.riccardomerolla.ziogrpc.core
 
 import io.grpc.Metadata
+import scala.jdk.CollectionConverters.*
 
 final case class GrpcMetadata(headers: Map[String, String]):
   def getHeader(name: String): Option[String] =
@@ -18,7 +19,7 @@ object GrpcMetadata:
   def fromGrpc(metadata: Metadata): GrpcMetadata =
     val headers = metadata
       .keys()
-      .toArray(new Array[String](metadata.keys().size()))
+      .asScala
       .toList
       .filterNot(_.endsWith("-bin"))
       .flatMap { key =>

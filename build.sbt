@@ -53,15 +53,18 @@ lazy val core = (project in file("zio-grpc-core"))
   )
 
 lazy val server = (project in file("zio-grpc-server"))
-  .dependsOn(core)
+  .dependsOn(core, client % Test)
   .settings(
     name := "zio-grpc-server",
     description := "Server DSL and handler composition for ZIO-gRPC.",
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % zioVersion,
       "io.grpc" % "grpc-netty" % grpcVersion,
-      "io.grpc" % "grpc-stub" % grpcVersion
-    )
+      "io.grpc" % "grpc-stub" % grpcVersion,
+      "dev.zio" %% "zio-test" % zioVersion % Test,
+      "dev.zio" %% "zio-test-sbt" % zioVersion % Test
+    ),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
 
 lazy val client = (project in file("zio-grpc-client"))

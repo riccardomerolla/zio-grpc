@@ -1,13 +1,14 @@
 package io.github.riccardomerolla.ziogrpc.server
 
-import zio.{ Chunk, Exit, Runtime, Scope, UIO, Unsafe, ZIO }
+import zio.{ Chunk, Runtime, Scope, UIO, Unsafe, ZIO }
 
 import java.net.InetSocketAddress
 
 import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcMetadata, GrpcRequestContext, GrpcStatusInterop }
-import io.grpc.{ MethodDescriptor, Server, ServerServiceDefinition, Status }
+import io.grpc.{ Metadata, MethodDescriptor, Server, ServerCall, ServerCallHandler, ServerServiceDefinition, Status }
 import io.grpc.netty.NettyServerBuilder
-import io.grpc.stub.ServerCalls
+import scala.concurrent.ExecutionContext
+import scala.util.{ Failure, Success }
 
 enum ServerError:
   case StartupFailure(details: String)
@@ -85,41 +86,66 @@ object GrpcServer:
   private def buildHandler[R, E, In, Out](
       endpoint: GrpcEndpoint[R, E, In, Out],
       runtime: Runtime[R],
-    ) =
+    ): ServerCallHandler[In, Out] =
     if endpoint.methodType != MethodDescriptor.MethodType.UNARY then
       throw new IllegalArgumentException(
         s"Unsupported method type: ${endpoint.methodType}"
       )
 
-    ServerCalls.asyncUnaryCall(
-      new ServerCalls.UnaryMethod[In, Out]:
-        override def invoke(request: In, observer: io.grpc.stub.StreamObserver[Out]): Unit =
-          val metadata = GrpcMetadata.empty
-          val context  = GrpcRequestContext(metadata, endpoint.methodName)
-          val effect   = GrpcRequestContext
-            .withContext(context) {
-              endpoint.handler.handle(metadata, request)
-            }
-            .mapError(error => GrpcStatusInterop.toStatusException(error)(using endpoint.errorCodec))
+    new ServerCallHandler[In, Out]:
+      override def startCall(
+          call: ServerCall[In, Out],
+          headers: Metadata,
+        ): ServerCall.Listener[In] =
+        given ExecutionContext = ExecutionContext.global
 
-          Unsafe.unsafe { implicit unsafe =>
-            runtime.unsafe.run(effect) match
-              case Exit.Success(value) =>
-                observer.onNext(value)
-                observer.onCompleted()
-              case Exit.Failure(cause) =>
-                cause.failureOption match
-                  case Some(statusException) => observer.onError(statusException)
-                  case None                  =>
-                    observer.onError(
-                      Status
-                        .INTERNAL
-                        .withDescription("Unhandled defect")
-                        .withCause(cause.squash)
-                        .asException()
+        new ServerCall.Listener[In]:
+          private var request: Option[In] = None
+
+          override def onMessage(message: In): Unit =
+            request = Some(message)
+
+          override def onHalfClose(): Unit =
+            val metadata                                     = GrpcMetadata.fromGrpc(headers)
+            val context                                      = GrpcRequestContext(metadata, endpoint.methodName)
+            val effect: ZIO[R, io.grpc.StatusException, Out] =
+              GrpcRequestContext
+                .withContext(context) {
+                  endpoint
+                    .handler
+                    .handle(
+                      metadata,
+                      request.getOrElse {
+                        throw new IllegalStateException("No request message received")
+                      },
                     )
-          }
-    )
+                }
+                .mapError(error => GrpcStatusInterop.toStatusException(error)(using endpoint.errorCodec))
+
+            Unsafe.unsafe { implicit unsafe =>
+              val future: scala.concurrent.Future[Out] =
+                runtime.unsafe.runToFuture(effect)
+
+              future.onComplete {
+                case Success(value)                                    =>
+                  call.sendHeaders(new Metadata())
+                  call.sendMessage(value)
+                  call.close(Status.OK, new Metadata())
+                case Failure(statusException: io.grpc.StatusException) =>
+                  call.close(statusException.getStatus, new Metadata())
+                case Failure(throwable)                                =>
+                  call.close(
+                    Status
+                      .INTERNAL
+                      .withDescription("Unhandled execution failure")
+                      .withCause(throwable),
+                    new Metadata(),
+                  )
+              }
+            }
+
+          override def onReady(): Unit =
+            call.request(1)
 
   private def serviceName(methodName: String): String =
     Option(MethodDescriptor.extractFullServiceName(methodName)).getOrElse(methodName)
