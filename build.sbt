@@ -28,6 +28,7 @@ inThisBuild(List(
 
 val zioVersion = "2.1.22"
 val grpcVersion = "1.65.1"
+val protobufVersion = "3.25.3"
 
 lazy val root = (project in file("."))
   .aggregate(core, server, client, codegen, examples)
@@ -44,8 +45,11 @@ lazy val core = (project in file("zio-grpc-core"))
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % zioVersion,
       "dev.zio" %% "zio-streams" % zioVersion,
-      "io.grpc" % "grpc-api" % grpcVersion
-    )
+      "io.grpc" % "grpc-api" % grpcVersion,
+      "dev.zio" %% "zio-test" % zioVersion % Test,
+      "dev.zio" %% "zio-test-sbt" % zioVersion % Test
+    ),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
 
 lazy val server = (project in file("zio-grpc-server"))
@@ -54,7 +58,9 @@ lazy val server = (project in file("zio-grpc-server"))
     name := "zio-grpc-server",
     description := "Server DSL and handler composition for ZIO-gRPC.",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % zioVersion
+      "dev.zio" %% "zio" % zioVersion,
+      "io.grpc" % "grpc-netty" % grpcVersion,
+      "io.grpc" % "grpc-stub" % grpcVersion
     )
   )
 
@@ -64,7 +70,9 @@ lazy val client = (project in file("zio-grpc-client"))
     name := "zio-grpc-client",
     description := "Client stubs and channel management for ZIO-gRPC.",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % zioVersion
+      "dev.zio" %% "zio" % zioVersion,
+      "io.grpc" % "grpc-netty" % grpcVersion,
+      "io.grpc" % "grpc-stub" % grpcVersion
     )
   )
 
@@ -74,7 +82,8 @@ lazy val codegen = (project in file("zio-grpc-codegen"))
     name := "zio-grpc-codegen",
     description := "Proto code generation utilities for ZIO-gRPC.",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % zioVersion
+      "dev.zio" %% "zio" % zioVersion,
+      "com.google.protobuf" % "protobuf-java" % protobufVersion
     )
   )
 
