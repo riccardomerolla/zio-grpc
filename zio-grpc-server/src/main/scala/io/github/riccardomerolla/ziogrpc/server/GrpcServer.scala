@@ -7,6 +7,7 @@ import java.net.InetSocketAddress
 import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcMetadata, GrpcRequestContext, GrpcStatusInterop }
 import io.grpc.{ Metadata, MethodDescriptor, Server, ServerCall, ServerCallHandler, ServerServiceDefinition, Status }
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.protobuf.services.ProtoReflectionService
 import scala.concurrent.ExecutionContext
 import scala.util.{ Failure, Success }
 
@@ -54,7 +55,8 @@ object GrpcServer:
     )
 
     val serviceDefinitions = buildServiceDefinitions(services, runtime)
-    serviceDefinitions.foldLeft(builder)((acc, service) => acc.addService(service)).build()
+    val withReflection     = builder.addService(ProtoReflectionService.newInstance())
+    serviceDefinitions.foldLeft(withReflection)((acc, service) => acc.addService(service)).build()
 
   private def buildServiceDefinitions[R](
       services: Chunk[GrpcService[R]],

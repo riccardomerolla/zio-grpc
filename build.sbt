@@ -2,6 +2,9 @@ ThisBuild / scalaVersion := "3.3.1"
 ThisBuild / organization := "io.github.riccardomerolla"
 ThisBuild / organizationName := "Riccardo Merolla"
 ThisBuild / organizationHomepage := Some(url("https://github.com/riccardomerolla"))
+Global / cancelable := false // avoid sbt interrupt stacktraces on Ctrl+C while running ZIO apps
+Global / excludeLintKeys += cancelable
+ThisBuild / run / fork := true  // run apps in a separate JVM so sbt threads don't interrupt them
 
 inThisBuild(List(
   organization := "io.github.riccardomerolla",
@@ -60,6 +63,7 @@ lazy val server = (project in file("zio-grpc-server"))
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % zioVersion,
       "io.grpc" % "grpc-netty" % grpcVersion,
+      "io.grpc" % "grpc-services" % grpcVersion,
       "io.grpc" % "grpc-stub" % grpcVersion,
       "dev.zio" %% "zio-test" % zioVersion % Test,
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test

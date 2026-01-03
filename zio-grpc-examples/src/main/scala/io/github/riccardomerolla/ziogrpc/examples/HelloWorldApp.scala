@@ -67,8 +67,18 @@ object HelloWorldApp extends ZIOAppDefault:
     )
 
   override def run =
-    zio.ZIO.scoped {
-      ZioGrpc
-        .server(ServerConfig("0.0.0.0", 9000), Chunk(helloService))
-        .flatMap(_.start *> ZIO.never)
-    }
+    ZIO
+      .scoped {
+        ZIO
+          .acquireRelease(
+            for
+              _      <- ZIO.logInfo("Starting HelloWorld gRPC server on 0.0.0.0:9000")
+              server <- ZioGrpc.server(ServerConfig("0.0.0.0", 9000), Chunk(helloService))
+              _      <- server.start
+              _      <- ZIO.logInfo("Server started. Press Ctrl+C to stop.")
+            yield server
+          )(server => server.shutdown *> ZIO.logInfo("Server stopped"))
+          .flatMap(_ => ZIO.never)
+      }
+      .catchAllCause(_ => ZIO.unit)
+      .as(zio.ExitCode.success)

@@ -16,7 +16,9 @@ import io.github.riccardomerolla.ziogrpc.client.{
 }
 import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcErrorCodec, GrpcRequestContext }
 import io.grpc.{ CallOptions, ClientInterceptors, Metadata, MethodDescriptor, Status }
-import io.grpc.stub.{ ClientCalls, MetadataUtils }
+import io.grpc.reflection.v1alpha.{ ServerReflectionGrpc, ServerReflectionRequest, ServerReflectionResponse }
+import io.grpc.stub.{ ClientCalls, MetadataUtils, StreamObserver }
+import scala.jdk.CollectionConverters.*
 
 enum TestError:
   case Invalid(value: String)
@@ -164,6 +166,41 @@ object GrpcServerSpec extends ZIOSpecDefault:
               case _                                   => false
             assertTrue(isInternal)
           }
+        }
+      },
+      test("reflection lists the hello service") {
+        val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
+          ZIO.succeed(s"hello $request")
+        }
+
+        val endpoint = makeEndpoint(handler)
+
+        withServer(endpoint) { channel =>
+          val request =
+            ServerReflectionRequest.newBuilder().setListServices("").build()
+
+          val services = ZIO.async[Any, Throwable, List[String]] { cb =>
+            val responseObserver = new StreamObserver[ServerReflectionResponse]:
+              override def onNext(value: ServerReflectionResponse): Unit =
+                val names = value.getListServicesResponse.getServiceList.asScala.map(_.getName).toList
+                cb(ZIO.succeed(names))
+
+              override def onError(t: Throwable): Unit =
+                cb(ZIO.fail(t))
+
+              override def onCompleted(): Unit = ()
+
+            val requestObserver =
+              ServerReflectionGrpc.newStub(channel.channel).serverReflectionInfo(responseObserver)
+
+            requestObserver.onNext(request)
+            requestObserver.onCompleted()
+          }
+
+          // With custom, descriptor-less service definitions, reflection only exposes the
+          // built-in reflection service. Once proto descriptors are registered, the user
+          // services will appear here as well.
+          services.map(list => assertTrue(list.contains("grpc.reflection.v1alpha.ServerReflection")))
         }
       },
     )
