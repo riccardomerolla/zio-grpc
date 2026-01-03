@@ -64,6 +64,7 @@ Codex’s job is to produce:
 * Use ZLayer for dependency injection and wiring.
 * **No `var`**, no shared mutable state.
 * Use `Ref`, `Queue`, `Hub`, etc. for concurrency.
+* Respect the three laws of the ZIO environment: accumulate requirements, allow weakening (sub-environments), and satisfy by providing dependencies once at the edge.
 
 ---
 
@@ -123,6 +124,9 @@ Avoid:
 * Use ADTs: `enum`, `case object`, `case class`.
 * Do not hide errors.
 * Do not swallow exceptions.
+* Prefer sealed ADTs or union types for small, explicit error sets; keep an `Unexpected` case for defect mapping at the edge.
+* Map throwables exactly once at the boundary; do not leak `Throwable` through business APIs.
+* Keep domain ADTs per subsystem and map them into higher-level wiring errors at the boundary when composing layers.
 
 Example:
 
@@ -165,6 +169,19 @@ object UserRepo:
 * No layer creation inside effect bodies.
 * Use `ZIO.serviceWithZIO` for service access.
 * Compose dependency graphs at the application boundary.
+* Define services as pure algebras (traits) without side-effectful constructors; keep implementations in `*Live` classes.
+* Prefer polymorphic services (type params on effect types) when this improves testing or reuse.
+* Honor the environment laws: accumulate requirements, allow narrowing, and satisfy dependencies once at the edge.
+* Use accessor helpers on the companion (`def doThing(...) = ZIO.serviceWithZIO[Svc](_.doThing(...))`) to avoid ad-hoc service lookups.
+
+### DI / Wiring Checklist
+
+* Typed error channels only (no raw `Throwable`); map to domain ADTs at the boundary.
+* Background work must be scoped (`forkScoped`, `acquireRelease`) so fibers are cleaned up.
+* No side effects in constructors; push real work into ZIO effects and layers.
+* Avoid recomputing layers per call; define at module boundaries and inject.
+* Map edge-service errors (Liquidity/Relayer/Signing) into wiring-level errors where layers are composed.
+* Scope all servers/loops/metrics updaters with `ZLayer.scoped` or `forkScoped`; never leave daemon fibers untracked.
 
 ---
 
@@ -189,6 +206,13 @@ Good example:
 ZIO.foreachPar(items)(process).withParallelism(16)
 ```
 
+Concurrency guidelines:
+
+* Prefer structured concurrency; bind child fibers to scopes with `forkScoped` or managed resources.
+* Move blocking I/O to `attemptBlocking`/`attemptBlockingInterrupt`; avoid `Thread.sleep` or busy-waiting.
+* Use coordination primitives (`Queue`, `Hub`, `Semaphore`, `RateLimiter`) instead of manual locks.
+* Cancel or supervise long-lived fibers; add finalizers for cleanup on interruption.
+
 ---
 
 # 7. Testing Standards
@@ -208,6 +232,14 @@ Tests must cover:
 * Boundary conditions
 * Resource cleanup
 * Time-based and concurrency behavior when applicable
+* Property-based and dynamic test generation for contract-heavy logic
+
+Testing guidelines:
+
+* Prefer `Gen` + `check`/`checkN` for invariants; add shrinking-friendly generators.
+* Use `TestClock`/`Live` with `adjust` or `sleep` instead of real time; assert schedules.
+* Keep test layers minimal (`ZLayer.succeed`/`fromZIO`) and tear down resources with `Scope`.
+* For streams, assert chunk safety with varied chunk sizes (`ZStream.fromChunks` and `transduce`).
 
 ---
 
@@ -265,6 +297,39 @@ breaker(effect)
 ZIO.addFinalizer(fiber.interrupt *> cleanup)
 ```
 
+## 10.5 Service Pattern Snapshot
+
+```scala
+trait FooService:
+  def doThing(in: Input): IO[FooError, Output]
+
+object FooService:
+  val live: ZLayer[FooClient, Nothing, FooService] =
+    ZLayer.fromFunction(FooServiceLive.apply)
+
+  def doThing(in: Input): IO[FooError, Output] =
+    ZIO.serviceWithZIO[FooService](_.doThing(in))
+```
+
+## 10.6 Typed Error Design
+
+* Prefer sealed ADTs or `enum` for domain errors; use union types when the set is small and explicit.
+* Represent unexpected errors explicitly (e.g., `case class Unexpected(cause: Throwable)`) and map throwables at the edge.
+* Keep error hierarchies purposeful; avoid stringly-typed errors or generic `Throwable` leaks.
+
+## 10.7 Stream & Chunk Practices
+
+* Use `ZStream.acquireRelease` for resourceful streams; close resources deterministically.
+* Favor chunk-aware processing (`mapChunksZIO`, `ZPipeline`) to reduce per-element overhead.
+* Validate chunk safety with different chunk sizes; avoid assumptions about singleton chunks.
+* Keep stream effects typed; prefer `mapZIO`/`mapZIOPar` with explicit error channels.
+
+## 10.8 Functional Design Patterns
+
+* Keep algebras minimal and composable; push interpretation to wiring layers.
+* Use `provideSomeLayer`/`provideLayer` to narrow environments instead of widening dependencies.
+* Combine schedules for retries/backoff, add timeouts or hedging when talking to external systems.
+
 ---
 
 # 11. Output Rules for Codex
@@ -309,3 +374,14 @@ Before responding, Codex must validate:
 * [ ] Code follows idiomatic Scala 3 style
 
 ---
+
+# 13. Build & Run
+The project uses `sbt` for all tasks.
+- **Compile:** `sbt compile`
+- **Format Code:** `sbt scalafmtAll` (Run this before submitting any changes)
+
+
+# 14. Testing Protocols
+You MUST verify your changes by running tests.
+- **Run Unit Tests:** `sbt test`
+  - *Note:* These use `ZIO Test` and `scalamock-zio`. They do not require external secrets.

@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Project template scaffolding for Scala 3 + ZIO 2.x libraries (typed errors, domain model, config helpers, service layer, tests, and sample app).
+- Multi-module scaffold for ZIO-gRPC (core/server/client/codegen/examples).
+- Initial typed APIs for codecs, handlers, server, client, and codegen.
 
 ### Changed
 
-- Replaced the previous implementation with the new `io.github.riccardomerolla.zio.quickstart` library starter structure.
+- Replaced the previous `zio-quickstart` template layout with the ZIO-gRPC project foundation.
 
 ### Deprecated
 
@@ -31,5 +32,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/.../compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/.../releases/tag/v0.1.0
+[Unreleased]: https://github.com/riccardomerolla/zio-grpc/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/riccardomerolla/zio-grpc/releases/tag/v0.1.0
