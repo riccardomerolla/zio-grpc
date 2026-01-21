@@ -1,5 +1,7 @@
 package io.github.riccardomerolla.ziogrpc.codegen
 
+import java.util.Base64
+
 import com.google.protobuf.DescriptorProtos.{ FileDescriptorProto, MethodDescriptorProto, ServiceDescriptorProto }
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
@@ -25,14 +27,19 @@ object ProtocGenZio:
       CodeGeneratorResponse.newBuilder().addAllFile(generated.asJava).build()
 
   private def generateFile(file: FileDescriptorProto): List[CodeGeneratorResponse.File] =
-    val pkg = file.getPackage
-    file.getServiceList.asScala.toList.map { service =>
-      val content  = renderService(pkg, service)
+    val pkg                = file.getPackage
+    val descriptorContent  = renderFileDescriptor(pkg, file)
+    val descriptorFileName = filePath(pkg, s"${file.getName.stripSuffix(".proto").capitalize}Descriptors.scala")
+    val descriptorFile     =
+      CodeGeneratorResponse.File.newBuilder().setName(descriptorFileName).setContent(descriptorContent).build()
+    val serviceFiles       = file.getServiceList.asScala.toList.map { service =>
+      val content  = renderService(pkg, file.getName, service)
       val fileName = filePath(pkg, s"${service.getName}ZioGrpc.scala")
       CodeGeneratorResponse.File.newBuilder().setName(fileName).setContent(content).build()
     }
+    descriptorFile :: serviceFiles
 
-  private def renderService(pkg: String, service: ServiceDescriptorProto): String =
+  private def renderService(pkg: String, protoFileName: String, service: ServiceDescriptorProto): String =
     val methods = service.getMethodList.asScala.toList
     val builder = new StringBuilder
 
@@ -47,8 +54,11 @@ object ProtocGenZio:
     builder.append(
       "import io.github.riccardomerolla.ziogrpc.server.{GrpcEndpoint, GrpcHandler, GrpcService}\n\n"
     )
+    builder.append("import com.google.protobuf.Descriptors\n")
 
     val serviceName = service.getName
+    val fullService =
+      if pkg.nonEmpty then s"$pkg.${serviceName}" else serviceName
 
     builder.append(s"trait ${serviceName}[E]:\n")
     methods.foreach { method =>
@@ -60,6 +70,8 @@ object ProtocGenZio:
 
     builder.append("\n")
     builder.append(s"object ${serviceName}:\n")
+    builder.append(s"  def serviceDescriptor: Descriptors.ServiceDescriptor =\n")
+    builder.append(s"    ${fileServiceDescriptorRef(pkg, protoFileName, serviceName)}\n\n")
     builder.append(s"  def service[E](\n")
     builder.append(s"    handler: ${serviceName}[E],\n")
     builder.append(s"    errorCodec: GrpcErrorCodec[E],\n")
@@ -77,12 +89,10 @@ object ProtocGenZio:
     builder.append(s"      Chunk(\n")
 
     methods.foreach { method =>
-      val methodName  = lowerFirst(method.getName)
-      val inputType   = scalaType(method.getInputType)
-      val outputType  = scalaType(method.getOutputType)
-      val fullService =
-        if pkg.nonEmpty then s"$pkg.${serviceName}" else serviceName
-      val fullMethod  = s"$fullService/${method.getName}"
+      val methodName = lowerFirst(method.getName)
+      val inputType  = scalaType(method.getInputType)
+      val outputType = scalaType(method.getOutputType)
+      val fullMethod = s"$fullService/${method.getName}"
 
       builder.append("        GrpcEndpoint(\n")
       builder.append(s"          methodName = \"$fullMethod\",\n")
@@ -96,13 +106,34 @@ object ProtocGenZio:
       builder.append("        ),\n")
     }
 
-    builder.append("      )\n")
+    builder.append("      ),\n")
+    builder.append(s"      descriptor = Some(serviceDescriptor)\n")
     builder.append("    )\n")
 
     builder.toString()
 
   private def hasStreamingMethod(service: ServiceDescriptorProto): Boolean =
     service.getMethodList.asScala.exists(method => method.getClientStreaming || method.getServerStreaming)
+
+  private def renderFileDescriptor(pkg: String, file: FileDescriptorProto): String =
+    val encoded = Base64.getEncoder.encodeToString(file.toByteArray)
+    val pkgLine = if pkg.nonEmpty then s"package $pkg\n\n" else ""
+    s"""|${pkgLine}import com.google.protobuf.{DescriptorProtos, Descriptors}
+        |import java.util.Base64
+        |
+        |object ${file.getName.stripSuffix(".proto").capitalize}Descriptors:
+        |  private val encoded: String = "$encoded"
+        |
+        |  lazy val fileDescriptor: Descriptors.FileDescriptor =
+        |    Descriptors.FileDescriptor.buildFrom(
+        |      DescriptorProtos.FileDescriptorProto.parseFrom(Base64.getDecoder.decode(encoded)),
+        |      Array.empty
+        |    )
+        |""".stripMargin
+
+  private def fileServiceDescriptorRef(pkg: String, protoFileName: String, serviceName: String): String =
+    val objName = s"${protoFileName.stripSuffix(".proto").capitalize}Descriptors"
+    s"$objName.fileDescriptor.findServiceByName(\"$serviceName\")"
 
   private def filePath(pkg: String, fileName: String): String =
     if pkg.isEmpty then fileName else s"${pkg.replace('.', '/')}/$fileName"
@@ -112,3 +143,6 @@ object ProtocGenZio:
 
   private def lowerFirst(value: String): String =
     if value.isEmpty then value else value.head.toLower + value.tail
+
+  private def fileNamePrefix(pkg: String): String =
+    pkg.split('.').lastOption.getOrElse("root").capitalize

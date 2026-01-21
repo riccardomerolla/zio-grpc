@@ -175,6 +175,7 @@ zio-grpc/
 - [ ] **Interop layer: sealed ADT ↔ Status mapping at edge**
 - [ ] Basic server/client DSL
 - [ ] Example: hello-world service
+- [ ] Reflection bootstrap (register reflection service; full descriptors follow in Phase 2)
 
 ### Phase 2: Production (2-3 months, parity + hardening)
 
@@ -194,6 +195,14 @@ zio-grpc/
 - [ ] zio-grpc-config integration
 - [ ] Metrics layer (Prometheus)
 - [ ] Load balancing client-side
+
+### Current Progress (Jan 2026)
+
+- ✅ Unary server/client path with typed error interop and ADT ↔ Status mapping
+- ✅ Minimal reflection service registration (grpcurl discoverable once descriptors are emitted)
+- ✅ Example hello-world service and smoke test
+- ⏳ Codegen (ScalaPB extension) to emit descriptors and typed errors for reflection/grpcurl
+- ⏳ Streaming support, middleware, and full reflection with generated descriptors
 
 ***
 

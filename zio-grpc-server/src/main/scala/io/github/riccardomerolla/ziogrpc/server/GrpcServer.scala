@@ -5,8 +5,18 @@ import zio.{ Chunk, Runtime, Scope, UIO, Unsafe, ZIO }
 import java.net.InetSocketAddress
 
 import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcMetadata, GrpcRequestContext, GrpcStatusInterop }
-import io.grpc.{ Metadata, MethodDescriptor, Server, ServerCall, ServerCallHandler, ServerServiceDefinition, Status }
+import io.grpc.{
+  Metadata,
+  MethodDescriptor,
+  Server,
+  ServerCall,
+  ServerCallHandler,
+  ServerServiceDefinition,
+  ServiceDescriptor,
+  Status,
+}
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.protobuf.ProtoFileDescriptorSupplier
 import io.grpc.protobuf.services.ProtoReflectionService
 import scala.concurrent.ExecutionContext
 import scala.util.{ Failure, Success }
@@ -62,14 +72,26 @@ object GrpcServer:
       services: Chunk[GrpcService[R]],
       runtime: Runtime[R],
     ): Chunk[ServerServiceDefinition] =
-    val endpoints = services.flatMap(_.endpoints)
-    val grouped   = endpoints.groupBy(endpoint => serviceName(endpoint.methodName))
+    val endpoints            = services.flatMap(_.endpoints)
+    val descriptorsByService = services.flatMap(svc => svc.descriptor.map(d => serviceName(d.getFullName) -> d)).toMap
+    val grouped              = endpoints.groupBy(endpoint => serviceName(endpoint.methodName))
 
     Chunk.fromIterable(
       grouped.map {
         case (service, serviceEndpoints) =>
+          val schemaDescriptor      = descriptorsByService.get(service).map(SchemaDescriptor.apply)
+          val grpcServiceDescriptor = schemaDescriptor match
+            case Some(schema) =>
+              val builder = ServiceDescriptor.newBuilder(service).setSchemaDescriptor(schema)
+              val methods = serviceEndpoints.map(ep => buildMethodDescriptor(ep))
+              methods.foldLeft(builder)((b, md) => b.addMethod(md)).build()
+            case None         => null
+
           serviceEndpoints
-            .foldLeft(ServerServiceDefinition.builder(service)) { (builder, endpoint) =>
+            .foldLeft(
+              if grpcServiceDescriptor != null then ServerServiceDefinition.builder(grpcServiceDescriptor)
+              else ServerServiceDefinition.builder(service)
+            ) { (builder, endpoint) =>
               builder.addMethod(buildMethodDescriptor(endpoint), buildHandler(endpoint, runtime))
             }
             .build()
@@ -151,3 +173,13 @@ object GrpcServer:
 
   private def serviceName(methodName: String): String =
     Option(MethodDescriptor.extractFullServiceName(methodName)).getOrElse(methodName)
+
+  final private case class SchemaDescriptor(
+      serviceDescriptor: com.google.protobuf.Descriptors.ServiceDescriptor
+    ) extends ProtoFileDescriptorSupplier,
+        io.grpc.protobuf.ProtoServiceDescriptorSupplier:
+    override def getFileDescriptor: com.google.protobuf.Descriptors.FileDescriptor =
+      serviceDescriptor.getFile
+
+    override def getServiceDescriptor: com.google.protobuf.Descriptors.ServiceDescriptor =
+      serviceDescriptor
