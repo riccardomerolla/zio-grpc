@@ -13,7 +13,7 @@ object ProtocGenZio:
     val response = generate(request)
     response.writeTo(System.out)
 
-  private def generate(request: CodeGeneratorRequest): CodeGeneratorResponse =
+  def generate(request: CodeGeneratorRequest): CodeGeneratorResponse =
     val files       = request.getProtoFileList.asScala.toList
     val unsupported = files.exists(file => file.getServiceList.asScala.exists(hasStreamingMethod))
 

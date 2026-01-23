@@ -93,8 +93,11 @@ lazy val codegen = (project in file("zio-grpc-codegen"))
     description := "Proto code generation utilities for ZIO-gRPC.",
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % zioVersion,
-      "com.google.protobuf" % "protobuf-java" % protobufVersion
+      "com.google.protobuf" % "protobuf-java" % protobufVersion,
+      "dev.zio" %% "zio-test" % zioVersion % Test,
+      "dev.zio" %% "zio-test-sbt" % zioVersion % Test
     ),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     assembly / mainClass := Some("io.github.riccardomerolla.ziogrpc.codegen.ProtocGenZio"),
     assembly / assemblyJarName := "protoc-gen-zio.jar",
     assembly / assemblyMergeStrategy := {
