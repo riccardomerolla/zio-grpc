@@ -1,0 +1,18 @@
+#!/bin/bash
+# Wrapper script for protoc-gen-zio plugin
+# This script is called by protoc with --plugin=protoc-gen-zio=<path>
+
+set -e
+
+# Find the JAR file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODEGEN_DIR="$(dirname "$SCRIPT_DIR")"
+JAR_FILE="$CODEGEN_DIR/target/scala-3.3.1/protoc-gen-zio.jar"
+
+if [ ! -f "$JAR_FILE" ]; then
+    echo "Error: Could not find $JAR_FILE. Run 'sbt assembly' first." >&2
+    exit 1
+fi
+
+# Run the plugin main class
+exec java -jar "$JAR_FILE" "$@"

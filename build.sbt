@@ -1,3 +1,5 @@
+import sbtassembly.AssemblyPlugin
+
 ThisBuild / scalaVersion := "3.3.1"
 ThisBuild / organization := "io.github.riccardomerolla"
 ThisBuild / organizationName := "Riccardo Merolla"
@@ -84,6 +86,7 @@ lazy val client = (project in file("zio-grpc-client"))
   )
 
 lazy val codegen = (project in file("zio-grpc-codegen"))
+  .enablePlugins(AssemblyPlugin)
   .dependsOn(core)
   .settings(
     name := "zio-grpc-codegen",
@@ -91,7 +94,13 @@ lazy val codegen = (project in file("zio-grpc-codegen"))
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % zioVersion,
       "com.google.protobuf" % "protobuf-java" % protobufVersion
-    )
+    ),
+    assembly / mainClass := Some("io.github.riccardomerolla.ziogrpc.codegen.ProtocGenZio"),
+    assembly / assemblyJarName := "protoc-gen-zio.jar",
+    assembly / assemblyMergeStrategy := {
+      case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+      case x => MergeStrategy.first
+    }
   )
 
 lazy val examples = (project in file("zio-grpc-examples"))
