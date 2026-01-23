@@ -1,6 +1,6 @@
 package io.github.riccardomerolla.ziogrpc.codegen
 
-import zio.test.{ assertTrue, suite, test, ZIOSpecDefault }
+import zio.test.{ assertTrue, ZIOSpecDefault }
 
 import com.google.protobuf.DescriptorProtos.{ FileDescriptorProto, MethodDescriptorProto, ServiceDescriptorProto }
 import com.google.protobuf.compiler.PluginProtos.{ CodeGeneratorRequest, CodeGeneratorResponse }
@@ -171,6 +171,111 @@ object ProtocGenZioSpec extends ZIOSpecDefault:
 
         assertTrue(
           serviceFile.exists(_.getContent.contains("MethodDescriptor.MethodType.UNARY"))
+        )
+      },
+      test("handles empty package name") {
+        val method = MethodDescriptorProto
+          .newBuilder()
+          .setName("Ping")
+          .setInputType("Empty")
+          .setOutputType("Empty")
+          .setClientStreaming(false)
+          .setServerStreaming(false)
+          .build()
+
+        val service = ServiceDescriptorProto
+          .newBuilder()
+          .setName("Health")
+          .addMethod(method)
+          .build()
+
+        val proto = FileDescriptorProto
+          .newBuilder()
+          .setName("health.proto")
+          .setPackage("") // empty package
+          .addService(service)
+          .build()
+
+        val request  = createRequest(proto)
+        val response = ProtocGenZio.generate(request)
+
+        assertTrue(
+          !response.hasError,
+          response.getFileCount == 2,
+        )
+
+        val serviceFile = response.getFileList.asScala.find(_.getName.endsWith("ZioGrpc.scala"))
+        assertTrue(
+          serviceFile.isDefined,
+          serviceFile.exists(!_.getContent.contains("package ")), // no package statement
+          serviceFile.exists(_.getContent.contains("trait Health[E]")),
+        )
+      },
+      test("generates multiple methods in service") {
+        val method1 = MethodDescriptorProto
+          .newBuilder()
+          .setName("Add")
+          .setInputType("Numbers")
+          .setOutputType("Result")
+          .setClientStreaming(false)
+          .setServerStreaming(false)
+          .build()
+
+        val method2 = MethodDescriptorProto
+          .newBuilder()
+          .setName("Subtract")
+          .setInputType("Numbers")
+          .setOutputType("Result")
+          .setClientStreaming(false)
+          .setServerStreaming(false)
+          .build()
+
+        val service = ServiceDescriptorProto
+          .newBuilder()
+          .setName("Math")
+          .addMethod(method1)
+          .addMethod(method2)
+          .build()
+
+        val proto = FileDescriptorProto
+          .newBuilder()
+          .setName("math.proto")
+          .setPackage("calc")
+          .addService(service)
+          .build()
+
+        val request  = createRequest(proto)
+        val response = ProtocGenZio.generate(request)
+
+        val serviceFile = response.getFileList.asScala.find(_.getName.endsWith("ZioGrpc.scala"))
+
+        assertTrue(
+          !response.hasError,
+          serviceFile.isDefined,
+          serviceFile.exists(_.getContent.contains("def add(request: Numbers)")),
+          serviceFile.exists(_.getContent.contains("def subtract(request: Numbers)")),
+          serviceFile.exists(_.getContent.contains("addRequestCodec")),
+          serviceFile.exists(_.getContent.contains("subtractRequestCodec")),
+        )
+      },
+      test("converts method names to lowerCamelCase") {
+        val proto = createTestProto(
+          packageName = "example",
+          serviceName = "Greeter",
+          methodName = "SayHello",
+          inputType = "HelloRequest",
+          outputType = "HelloReply",
+        )
+
+        val request  = createRequest(proto)
+        val response = ProtocGenZio.generate(request)
+
+        val serviceFile = response.getFileList.asScala.find(_.getName.endsWith("ZioGrpc.scala"))
+
+        assertTrue(
+          serviceFile.isDefined,
+          serviceFile.exists(_.getContent.contains("def sayHello(request: HelloRequest)")),
+          serviceFile.exists(_.getContent.contains("handler.sayHello(request)")),
         )
       },
     )

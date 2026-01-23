@@ -2,7 +2,7 @@ package io.github.riccardomerolla.ziogrpc.codegen
 
 import java.util.Base64
 
-import com.google.protobuf.DescriptorProtos.{ FileDescriptorProto, MethodDescriptorProto, ServiceDescriptorProto }
+import com.google.protobuf.DescriptorProtos.{ FileDescriptorProto, ServiceDescriptorProto }
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
 import scala.jdk.CollectionConverters._
@@ -71,7 +71,7 @@ object ProtocGenZio:
     builder.append("\n")
     builder.append(s"object ${serviceName}:\n")
     builder.append(s"  def serviceDescriptor: Descriptors.ServiceDescriptor =\n")
-    builder.append(s"    ${fileServiceDescriptorRef(pkg, protoFileName, serviceName)}\n\n")
+    builder.append(s"    ${fileServiceDescriptorRef(protoFileName, serviceName)}\n\n")
     builder.append(s"  def service[E](\n")
     builder.append(s"    handler: ${serviceName}[E],\n")
     builder.append(s"    errorCodec: GrpcErrorCodec[E],\n")
@@ -90,8 +90,6 @@ object ProtocGenZio:
 
     methods.foreach { method =>
       val methodName = lowerFirst(method.getName)
-      val inputType  = scalaType(method.getInputType)
-      val outputType = scalaType(method.getOutputType)
       val fullMethod = s"$fullService/${method.getName}"
 
       builder.append("        GrpcEndpoint(\n")
@@ -131,7 +129,7 @@ object ProtocGenZio:
         |    )
         |""".stripMargin
 
-  private def fileServiceDescriptorRef(pkg: String, protoFileName: String, serviceName: String): String =
+  private def fileServiceDescriptorRef(protoFileName: String, serviceName: String): String =
     val objName = s"${protoFileName.stripSuffix(".proto").capitalize}Descriptors"
     s"$objName.fileDescriptor.findServiceByName(\"$serviceName\")"
 
@@ -142,7 +140,4 @@ object ProtocGenZio:
     protoType.split('.').lastOption.getOrElse(protoType)
 
   private def lowerFirst(value: String): String =
-    if value.isEmpty then value else value.head.toLower + value.tail
-
-  private def fileNamePrefix(pkg: String): String =
-    pkg.split('.').lastOption.getOrElse("root").capitalize
+    if value.isEmpty then value else s"${value.head.toLower}${value.tail}"
