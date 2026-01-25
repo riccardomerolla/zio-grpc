@@ -5,9 +5,9 @@ import zio.Chunk
 import com.google.protobuf.Descriptors
 
 final case class GrpcService[-R](
-    endpoints: Chunk[GrpcEndpoint[R, ?, ?, ?]],
-    descriptor: Option[Descriptors.ServiceDescriptor] = None,
-  )
+  endpoints: Chunk[GrpcEndpoint[R, ?, ?, ?]],
+  descriptor: Option[Descriptors.ServiceDescriptor] = None,
+)
 
 object GrpcService:
   def empty[R]: GrpcService[R] = GrpcService(Chunk.empty)

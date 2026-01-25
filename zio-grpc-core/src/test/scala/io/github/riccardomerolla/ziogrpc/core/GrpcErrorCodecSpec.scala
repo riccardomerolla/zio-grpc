@@ -1,6 +1,7 @@
 package io.github.riccardomerolla.ziogrpc.core
 
-import zio.test.{ assertTrue, suite, test, ZIOSpecDefault }
+import zio.Scope
+import zio.test.{ Spec, TestEnvironment, ZIOSpecDefault, assertTrue }
 
 import io.grpc.Status
 
@@ -27,7 +28,7 @@ object GrpcErrorCodecSpec extends ZIOSpecDefault:
       ),
     )
 
-  override def spec =
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("GrpcErrorCodec")(
       test("maps errors to statuses") {
         val status = codec.toStatus(TestError.NotFound("42"))

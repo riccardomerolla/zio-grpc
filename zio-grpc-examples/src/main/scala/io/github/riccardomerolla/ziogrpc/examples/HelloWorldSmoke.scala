@@ -1,29 +1,28 @@
 package io.github.riccardomerolla.ziogrpc.examples
 
-import zio.{ Chunk, Scope, ZIO, ZIOAppDefault, ZLayer }
-
 import java.nio.charset.StandardCharsets
 
+import zio.{ Chunk, Scope, ZIO, ZIOAppDefault }
+
 import io.github.riccardomerolla.ziogrpc.client.{ ChannelConfig, ClientError, GrpcChannel, GrpcClient, GrpcClientCall }
-import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcErrorCodec, GrpcMetadata }
+import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcCodecError, GrpcErrorCodec, GrpcMetadata }
 import io.github.riccardomerolla.ziogrpc.server.{ GrpcEndpoint, GrpcHandler, GrpcService, ServerConfig, ZioGrpc }
 import io.grpc.MethodDescriptor
-import io.grpc.Status
 
 object HelloWorldSmoke extends ZIOAppDefault:
   private given GrpcErrorCodec[HelloError]               = HelloError.codec
   private val helloRequestCodec: GrpcCodec[HelloRequest] = new GrpcCodec[HelloRequest]:
-    override def encode(value: HelloRequest) =
+    override def encode(value: HelloRequest): Either[GrpcCodecError, Array[Byte]] =
       Right(value.name.getBytes(StandardCharsets.UTF_8))
 
-    override def decode(bytes: Array[Byte]) =
+    override def decode(bytes: Array[Byte]): Either[GrpcCodecError, HelloRequest] =
       Right(HelloRequest(String(bytes, StandardCharsets.UTF_8)))
 
   private val helloReplyCodec: GrpcCodec[HelloReply] = new GrpcCodec[HelloReply]:
-    override def encode(value: HelloReply) =
+    override def encode(value: HelloReply): Either[GrpcCodecError, Array[Byte]] =
       Right(value.message.getBytes(StandardCharsets.UTF_8))
 
-    override def decode(bytes: Array[Byte]) =
+    override def decode(bytes: Array[Byte]): Either[GrpcCodecError, HelloReply] =
       Right(HelloReply(String(bytes, StandardCharsets.UTF_8)))
 
   private val helloHandler: GrpcHandler[Any, HelloError, HelloRequest, HelloReply] =

@@ -3,9 +3,9 @@ package io.github.riccardomerolla.ziogrpc.core
 import zio.{ FiberRef, UIO, Unsafe, ZIO }
 
 final case class GrpcRequestContext(
-    metadata: GrpcMetadata,
-    methodName: String,
-  )
+  metadata: GrpcMetadata,
+  methodName: String,
+)
 
 object GrpcRequestContext:
   private val fiberRef: FiberRef[Option[GrpcRequestContext]] =

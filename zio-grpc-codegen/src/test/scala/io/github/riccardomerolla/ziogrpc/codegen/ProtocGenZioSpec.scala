@@ -1,20 +1,22 @@
 package io.github.riccardomerolla.ziogrpc.codegen
 
-import zio.test.{ assertTrue, ZIOSpecDefault }
+import scala.jdk.CollectionConverters.*
+
+import zio.Scope
+import zio.test.{ Spec, TestEnvironment, ZIOSpecDefault, assertTrue }
 
 import com.google.protobuf.DescriptorProtos.{ FileDescriptorProto, MethodDescriptorProto, ServiceDescriptorProto }
 import com.google.protobuf.compiler.PluginProtos.{ CodeGeneratorRequest, CodeGeneratorResponse }
-import scala.jdk.CollectionConverters._
 
 object ProtocGenZioSpec extends ZIOSpecDefault:
 
   private def createTestProto(
-      packageName: String,
-      serviceName: String,
-      methodName: String,
-      inputType: String,
-      outputType: String,
-    ): FileDescriptorProto =
+    packageName: String,
+    serviceName: String,
+    methodName: String,
+    inputType: String,
+    outputType: String,
+  ): FileDescriptorProto =
     val method = MethodDescriptorProto
       .newBuilder()
       .setName(methodName)
@@ -43,7 +45,7 @@ object ProtocGenZioSpec extends ZIOSpecDefault:
       .addAllProtoFile(files.asJava)
       .build()
 
-  override def spec =
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("ProtocGenZio")(
       test("generates service trait for unary RPC") {
         val proto = createTestProto(

@@ -1,24 +1,18 @@
 package io.github.riccardomerolla.ziogrpc.server
 
-import zio.{ Chunk, ZIO }
-import zio.test.{ assertTrue, suite, test, ZIOSpecDefault }
-
 import java.net.ServerSocket
 import java.nio.charset.StandardCharsets
 
-import io.github.riccardomerolla.ziogrpc.client.{
-  ChannelConfig,
-  ClientError,
-  GrpcChannel,
-  GrpcChannelLive,
-  GrpcClient,
-  GrpcClientCall,
-}
-import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcErrorCodec, GrpcRequestContext }
-import io.grpc.{ CallOptions, ClientInterceptors, Metadata, MethodDescriptor, Status }
+import scala.jdk.CollectionConverters.*
+
+import zio.test.{ Spec, TestEnvironment, ZIOSpecDefault, assertTrue }
+import zio.{ Chunk, Scope, ZIO }
+
+import io.github.riccardomerolla.ziogrpc.client.{ ChannelConfig, ClientError, GrpcChannel, GrpcClient, GrpcClientCall }
+import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcCodecError, GrpcErrorCodec, GrpcRequestContext }
 import io.grpc.reflection.v1alpha.{ ServerReflectionGrpc, ServerReflectionRequest, ServerReflectionResponse }
 import io.grpc.stub.{ ClientCalls, MetadataUtils, StreamObserver }
-import scala.jdk.CollectionConverters.*
+import io.grpc.{ CallOptions, ClientInterceptors, Metadata, MethodDescriptor, Status }
 
 enum TestError:
   case Invalid(value: String)
@@ -28,17 +22,17 @@ object GrpcServerSpec extends ZIOSpecDefault:
   private val methodName = "test.Greeter/SayHello"
 
   private val requestCodec: GrpcCodec[String] = new GrpcCodec[String]:
-    override def encode(value: String) =
+    override def encode(value: String): Either[GrpcCodecError, Array[Byte]] =
       Right(value.getBytes(StandardCharsets.UTF_8))
 
-    override def decode(bytes: Array[Byte]) =
+    override def decode(bytes: Array[Byte]): Either[GrpcCodecError, String] =
       Right(String(bytes, StandardCharsets.UTF_8))
 
   private val responseCodec: GrpcCodec[String] = new GrpcCodec[String]:
-    override def encode(value: String) =
+    override def encode(value: String): Either[GrpcCodecError, Array[Byte]] =
       Right(value.getBytes(StandardCharsets.UTF_8))
 
-    override def decode(bytes: Array[Byte]) =
+    override def decode(bytes: Array[Byte]): Either[GrpcCodecError, String] =
       Right(String(bytes, StandardCharsets.UTF_8))
 
   private val errorCodec: GrpcErrorCodec[TestError] =
@@ -73,7 +67,7 @@ object GrpcServerSpec extends ZIOSpecDefault:
   private val clientCall: GrpcClientCall[String, String] =
     GrpcClientCall.unary(methodDescriptor)
 
-  override def spec =
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("GrpcServer")(
       test("unary call succeeds") {
         val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
@@ -206,8 +200,8 @@ object GrpcServerSpec extends ZIOSpecDefault:
     )
 
   private def makeEndpoint(
-      handler: GrpcHandler[Any, TestError, String, String]
-    ): GrpcEndpoint[Any, TestError, String, String] =
+    handler: GrpcHandler[Any, TestError, String, String]
+  ): GrpcEndpoint[Any, TestError, String, String] =
     GrpcEndpoint(
       methodName = methodName,
       methodType = MethodDescriptor.MethodType.UNARY,
@@ -218,10 +212,10 @@ object GrpcServerSpec extends ZIOSpecDefault:
     )
 
   private def withServer[A](
-      endpoint: GrpcEndpoint[Any, TestError, String, String]
-    )(
-      use: GrpcChannel => ZIO[Any, Any, A]
-    ): ZIO[Any, Throwable, A] =
+    endpoint: GrpcEndpoint[Any, TestError, String, String]
+  )(
+    use: GrpcChannel => ZIO[Any, Any, A]
+  ): ZIO[Any, Throwable, A] =
     ZIO.scoped {
       for
         port    <- freePort

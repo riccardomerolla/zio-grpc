@@ -83,7 +83,7 @@ Agent’s job is to produce:
 ## 3.1 Build & Run
 The project uses `sbt` for all tasks.
 - **Compile:** `sbt compile`
-- **Format Code:** `sbt scalafmtAll` (Run this before submitting any changes)
+- **Format Code:** `sbt fmt` (Run this before submitting any changes)
 - **Build Fat JAR:** `sbt assembly`
 
 ## 3.2 Testing Protocols

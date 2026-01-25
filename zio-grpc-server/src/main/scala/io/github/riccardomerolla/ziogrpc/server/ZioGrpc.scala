@@ -4,15 +4,15 @@ import zio.{ Chunk, Scope, ZIO }
 
 object ZioGrpc:
   def server[R](
-      config: ServerConfig,
-      services: Chunk[GrpcService[R]],
-    ): ZIO[R & Scope, ServerError, GrpcServer] =
+    config: ServerConfig,
+    services: Chunk[GrpcService[R]],
+  ): ZIO[R & Scope, ServerError, GrpcServer] =
     GrpcServer.scoped(config, services)
 
   def server[R](
-      host: String,
-      port: Int,
-    )(
-      services: GrpcService[R]*
-    ): ZIO[R & Scope, ServerError, GrpcServer] =
+    host: String,
+    port: Int,
+  )(
+    services: GrpcService[R]*
+  ): ZIO[R & Scope, ServerError, GrpcServer] =
     server(ServerConfig(host, port), Chunk.fromIterable(services))

@@ -2,10 +2,10 @@ package io.github.riccardomerolla.ziogrpc.codegen
 
 import java.util.Base64
 
+import scala.jdk.CollectionConverters.*
+
 import com.google.protobuf.DescriptorProtos.{ FileDescriptorProto, ServiceDescriptorProto }
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse
-import scala.jdk.CollectionConverters._
+import com.google.protobuf.compiler.PluginProtos.{ CodeGeneratorRequest, CodeGeneratorResponse }
 
 object ProtocGenZio:
   def main(args: Array[String]): Unit =
@@ -70,11 +70,11 @@ object ProtocGenZio:
 
     builder.append("\n")
     builder.append(s"object ${serviceName}:\n")
-    builder.append(s"  def serviceDescriptor: Descriptors.ServiceDescriptor =\n")
+    builder.append("  def serviceDescriptor: Descriptors.ServiceDescriptor =\n")
     builder.append(s"    ${fileServiceDescriptorRef(protoFileName, serviceName)}\n\n")
-    builder.append(s"  def service[E](\n")
+    builder.append("  def service[E](\n")
     builder.append(s"    handler: ${serviceName}[E],\n")
-    builder.append(s"    errorCodec: GrpcErrorCodec[E],\n")
+    builder.append("    errorCodec: GrpcErrorCodec[E],\n")
 
     methods.foreach { method =>
       val methodName = lowerFirst(method.getName)
@@ -84,9 +84,9 @@ object ProtocGenZio:
       builder.append(s"    ${methodName}ResponseCodec: GrpcCodec[$outputType],\n")
     }
 
-    builder.append(s"  ): GrpcService[Any] =\n")
-    builder.append(s"    GrpcService(\n")
-    builder.append(s"      Chunk(\n")
+    builder.append("  ): GrpcService[Any] =\n")
+    builder.append("    GrpcService(\n")
+    builder.append("      Chunk(\n")
 
     methods.foreach { method =>
       val methodName = lowerFirst(method.getName)
@@ -105,7 +105,7 @@ object ProtocGenZio:
     }
 
     builder.append("      ),\n")
-    builder.append(s"      descriptor = Some(serviceDescriptor)\n")
+    builder.append("      descriptor = Some(serviceDescriptor)\n")
     builder.append("    )\n")
 
     builder.toString()

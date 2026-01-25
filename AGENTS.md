@@ -378,7 +378,7 @@ Before responding, Codex must validate:
 # 13. Build & Run
 The project uses `sbt` for all tasks.
 - **Compile:** `sbt compile`
-- **Format Code:** `sbt scalafmtAll` (Run this before submitting any changes)
+- **Format Code:** `sbt fmt` (Run this before submitting any changes)
 
 
 # 14. Testing Protocols

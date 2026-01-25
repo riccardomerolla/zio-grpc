@@ -10,9 +10,9 @@ object GrpcStatusInterop:
     codec.toStatus(error)
 
   def fromStatusException[E](
-      exception: StatusException
-    )(using codec: GrpcErrorCodec[E]
-    ): Option[E] =
+    exception: StatusException
+  )(using codec: GrpcErrorCodec[E]
+  ): Option[E] =
     codec.fromStatus(exception.getStatus)
 
   def fromStatus[E](status: Status)(using codec: GrpcErrorCodec[E]): Option[E] =

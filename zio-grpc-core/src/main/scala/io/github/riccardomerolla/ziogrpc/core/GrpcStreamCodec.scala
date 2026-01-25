@@ -5,9 +5,9 @@ import zio.stream.ZStream
 
 trait GrpcStreamCodec[A]:
   def encode(
-      stream: ZStream[Any, GrpcCodecError, A]
-    ): ZStream[Any, GrpcCodecError, Chunk[Byte]]
+    stream: ZStream[Any, GrpcCodecError, A]
+  ): ZStream[Any, GrpcCodecError, Chunk[Byte]]
 
   def decode(
-      stream: ZStream[Any, GrpcCodecError, Chunk[Byte]]
-    ): ZStream[Any, GrpcCodecError, A]
+    stream: ZStream[Any, GrpcCodecError, Chunk[Byte]]
+  ): ZStream[Any, GrpcCodecError, A]

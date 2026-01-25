@@ -1,7 +1,8 @@
 package io.github.riccardomerolla.ziogrpc.core
 
-import io.grpc.Metadata
 import scala.jdk.CollectionConverters.*
+
+import io.grpc.Metadata
 
 final case class GrpcMetadata(headers: Map[String, String]):
   def getHeader(name: String): Option[String] =

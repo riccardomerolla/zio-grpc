@@ -1,5 +1,7 @@
 package io.github.riccardomerolla.ziogrpc.core
 
+import java.io.InputStream
+
 import io.grpc.MethodDescriptor
 
 enum GrpcCodecError:
@@ -13,10 +15,10 @@ trait GrpcCodec[A]:
 object GrpcCodec:
   def marshaller[A](codec: GrpcCodec[A]): MethodDescriptor.Marshaller[A] =
     new MethodDescriptor.Marshaller[A]:
-      override def stream(value: A) =
+      override def stream(value: A): InputStream =
         val bytes = codec.encode(value) match
           case Left(error)    =>
-            throw new IllegalArgumentException(error.toString)
+            throw new IllegalArgumentException(error.toString) // scalafix:ok DisableSyntax.throw
           case Right(encoded) =>
             encoded
         new java.io.ByteArrayInputStream(bytes)
@@ -24,5 +26,5 @@ object GrpcCodec:
       override def parse(stream: java.io.InputStream): A =
         val bytes = stream.readAllBytes()
         codec.decode(bytes) match
-          case Left(error)  => throw new IllegalArgumentException(error.toString)
+          case Left(error)  => throw new IllegalArgumentException(error.toString) // scalafix:ok DisableSyntax.throw
           case Right(value) => value

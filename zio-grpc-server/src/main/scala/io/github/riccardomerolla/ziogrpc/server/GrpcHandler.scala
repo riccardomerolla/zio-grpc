@@ -9,8 +9,8 @@ trait GrpcHandler[-R, +E, -In, +Out]:
 
 object GrpcHandler:
   def fromFunction[R, E, In, Out](
-      f: (GrpcMetadata, In) => ZIO[R, E, Out]
-    ): GrpcHandler[R, E, In, Out] =
+    f: (GrpcMetadata, In) => ZIO[R, E, Out]
+  ): GrpcHandler[R, E, In, Out] =
     new GrpcHandler[R, E, In, Out]:
       override def handle(metadata: GrpcMetadata, input: In): ZIO[R, E, Out] =
         f(metadata, input)

@@ -8,27 +8,27 @@ trait GrpcErrorCodec[E]:
 
 object GrpcErrorCodec:
   final case class ErrorMapping[E](
-      toStatus: PartialFunction[E, Status],
-      fromStatus: Status => Option[E],
-    )
+    toStatus: PartialFunction[E, Status],
+    fromStatus: Status => Option[E],
+  )
 
   def apply[E](
-      to: E => Status,
-      from: Status => Option[E],
-    ): GrpcErrorCodec[E] =
+    to: E => Status,
+    from: Status => Option[E],
+  ): GrpcErrorCodec[E] =
     new GrpcErrorCodec[E]:
       override def toStatus(error: E): Status            = to(error)
       override def fromStatus(status: Status): Option[E] = from(status)
 
   def mapping[E](
-      toStatus: PartialFunction[E, Status],
-      fromStatus: Status => Option[E],
-    ): ErrorMapping[E] =
+    toStatus: PartialFunction[E, Status],
+    fromStatus: Status => Option[E],
+  ): ErrorMapping[E] =
     ErrorMapping(toStatus, fromStatus)
 
   def derive[E](
-      mappings: ErrorMapping[E]*
-    ): GrpcErrorCodec[E] =
+    mappings: ErrorMapping[E]*
+  ): GrpcErrorCodec[E] =
     val combinedToStatus = mappings
       .map(_.toStatus)
       .reduceLeftOption(_ orElse _)

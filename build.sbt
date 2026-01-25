@@ -1,6 +1,6 @@
 import sbtassembly.AssemblyPlugin
 
-ThisBuild / scalaVersion := "3.3.1"
+ThisBuild / scalaVersion := "3.3.7"
 ThisBuild / organization := "io.github.riccardomerolla"
 ThisBuild / organizationName := "Riccardo Merolla"
 ThisBuild / organizationHomepage := Some(url("https://github.com/riccardomerolla"))
@@ -8,7 +8,11 @@ Global / cancelable := false // avoid sbt interrupt stacktraces on Ctrl+C while 
 Global / excludeLintKeys += cancelable
 ThisBuild / run / fork := true  // run apps in a separate JVM so sbt threads don't interrupt them
 
+addCommandAlias("fmt", " ; scalafixAll ; scalafmtAll")
+addCommandAlias("check", "; scalafixAll --check; scalafmtCheckAll")
+
 inThisBuild(List(
+  semanticdbEnabled                := true,
   organization := "io.github.riccardomerolla",
   homepage := Some(url("https://github.com/riccardomerolla/zio-grpc")),
   licenses := Seq(
@@ -28,10 +32,15 @@ inThisBuild(List(
       "scm:git@github.com:riccardomerolla/zio-grpc.git"
     )
   ),
-  versionScheme := Some("early-semver")
+  versionScheme := Some("early-semver"),
+  scalacOptions ++= Seq(
+    "-language:existentials",
+    "-explain",
+    "-Wunused:all",
+  ),
 ))
 
-val zioVersion = "2.1.22"
+val zioVersion = "2.1.24"
 val grpcVersion = "1.65.1"
 val protobufVersion = "3.25.3"
 

@@ -59,7 +59,7 @@ sbt compile
 sbt test
 
 # Format code (MUST run before commits)
-sbt scalafmtAll
+sbt fmt
 
 # Compile a specific module
 sbt "project zio-grpc-server" compile
