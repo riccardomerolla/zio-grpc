@@ -41,6 +41,7 @@ inThisBuild(List(
 ))
 
 val zioVersion = "2.1.24"
+val zioLoggingVersion = "2.5.3"
 val grpcVersion = "1.65.1"
 val protobufVersion = "3.25.3"
 
@@ -122,6 +123,11 @@ lazy val examples = (project in file("zio-grpc-examples"))
     description := "Example services built with ZIO-gRPC.",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % zioVersion
+      "dev.zio" %% "zio"         % zioVersion,
+      "dev.zio" %% "zio-logging" % zioLoggingVersion
     )
   )
+
+coverageMinimumStmtTotal := 80
+coverageFailOnMinimum := true
+coverageHighlighting := true

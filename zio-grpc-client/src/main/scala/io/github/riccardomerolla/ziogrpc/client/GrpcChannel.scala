@@ -28,4 +28,8 @@ object GrpcChannel:
           )
         }
         .mapError(error => ChannelError.ConnectionFailed(error.getMessage))
-    )(_.shutdown)
+        <* ZIO.logInfo(s"gRPC channel connected to ${config.target}")
+    )(channel =>
+      ZIO.logInfo(s"gRPC channel disconnecting from ${config.target}") *>
+        channel.shutdown
+    )

@@ -83,6 +83,27 @@ object GrpcServerSpec extends ZIOSpecDefault:
           }
         }
       },
+      test("shutdown completes successfully") {
+        val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
+          ZIO.succeed(s"hello $request")
+        }
+
+        val endpoint = makeEndpoint(handler)
+
+        ZIO.scoped {
+          for
+            port   <- freePort
+            server <- ZioGrpc
+                        .server(
+                          ServerConfig("127.0.0.1", port),
+                          Chunk(GrpcService(Chunk(endpoint))),
+                        )
+                        .mapError(error => new RuntimeException(error.toString))
+            _      <- server.start.mapError(error => new RuntimeException(error.toString))
+            _      <- server.shutdown
+          yield assertTrue(true)
+        }
+      },
       test("error maps to client remote error") {
         val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
           if request == "bad" then ZIO.fail(TestError.Invalid(request))
@@ -162,6 +183,35 @@ object GrpcServerSpec extends ZIOSpecDefault:
           }
         }
       },
+      test("logging middleware does not break unary call") {
+        val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
+          ZIO.succeed(s"hello $request")
+        }
+
+        val endpoint = makeEndpoint(handler)
+
+        withServerService(GrpcService(Chunk(endpoint)).withMiddleware(LoggingMiddleware.default)) { channel =>
+          val client = GrpcClient(channel)
+          client.unary(clientCall, "zio").map { response =>
+            assertTrue(response == "hello zio")
+          }
+        }
+      },
+      test("logging middleware preserves error behavior") {
+        val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
+          if request == "bad" then ZIO.fail(TestError.Invalid(request))
+          else ZIO.succeed(s"ok $request")
+        }
+
+        val endpoint = makeEndpoint(handler)
+
+        withServerService(GrpcService(Chunk(endpoint)).withMiddleware(LoggingMiddleware.default)) { channel =>
+          val client = GrpcClient(channel)
+          client.unary(clientCall, "bad").either.map { result =>
+            assertTrue(result == Left(ClientError.Remote(TestError.Invalid("bad"))))
+          }
+        }
+      },
       test("reflection lists the hello service") {
         val handler = GrpcHandler.fromFunction[Any, TestError, String, String] { (_, request) =>
           ZIO.succeed(s"hello $request")
@@ -223,6 +273,31 @@ object GrpcServerSpec extends ZIOSpecDefault:
                      .server(
                        ServerConfig("127.0.0.1", port),
                        Chunk(GrpcService(Chunk(endpoint))),
+                     )
+                     .mapError(error => new RuntimeException(error.toString))
+        _       <- server.start.mapError(error => new RuntimeException(error.toString))
+        channel <- GrpcChannel
+                     .scoped(ChannelConfig(s"127.0.0.1:$port"))
+                     .mapError(error => new RuntimeException(error.toString))
+        result  <- use(channel).mapError {
+                     case throwable: Throwable => throwable
+                     case other                => new RuntimeException(other.toString)
+                   }
+      yield result
+    }
+
+  private def withServerService[A](
+    service: GrpcService[Any]
+  )(
+    use: GrpcChannel => ZIO[Any, Any, A]
+  ): ZIO[Any, Throwable, A] =
+    ZIO.scoped {
+      for
+        port    <- freePort
+        server  <- ZioGrpc
+                     .server(
+                       ServerConfig("127.0.0.1", port),
+                       Chunk(service),
                      )
                      .mapError(error => new RuntimeException(error.toString))
         _       <- server.start.mapError(error => new RuntimeException(error.toString))

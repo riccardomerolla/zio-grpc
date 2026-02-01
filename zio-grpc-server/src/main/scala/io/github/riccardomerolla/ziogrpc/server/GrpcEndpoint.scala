@@ -11,3 +11,8 @@ final case class GrpcEndpoint[-R, E, In, Out](
   handler: GrpcHandler[R, E, In, Out],
   errorCodec: GrpcErrorCodec[E],
 )
+
+object GrpcEndpoint:
+  extension [R, E, In, Out](self: GrpcEndpoint[R, E, In, Out])
+    def withMiddleware(mw: GrpcMiddleware[R]): GrpcEndpoint[R, E, In, Out] =
+      self.copy(handler = mw(self.handler))

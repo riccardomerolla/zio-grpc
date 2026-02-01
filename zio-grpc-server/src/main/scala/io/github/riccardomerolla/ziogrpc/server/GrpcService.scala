@@ -7,6 +7,7 @@ import com.google.protobuf.Descriptors
 final case class GrpcService[-R](
   endpoints: Chunk[GrpcEndpoint[R, ?, ?, ?]],
   descriptor: Option[Descriptors.ServiceDescriptor] = None,
+  middleware: GrpcMiddleware[R] = GrpcMiddleware.identity,
 )
 
 object GrpcService:
@@ -14,4 +15,10 @@ object GrpcService:
 
   extension [R](self: GrpcService[R])
     def ++(other: GrpcService[R]): GrpcService[R] =
-      GrpcService(self.endpoints ++ other.endpoints)
+      GrpcService(
+        self.endpoints.map(_.withMiddleware(self.middleware)) ++
+          other.endpoints.map(_.withMiddleware(other.middleware))
+      )
+
+    def withMiddleware(mw: GrpcMiddleware[R]): GrpcService[R] =
+      self.copy(middleware = self.middleware ++ mw)
