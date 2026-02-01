@@ -45,7 +45,11 @@ object GrpcServer:
                    ZIO
                      .attempt(buildServer(config, services, runtime))
                      .mapError(error => ServerError.StartupFailure(error.getMessage))
-                 )(server => ZIO.attempt(server.shutdown()).unit.orDie)
+                     <* ZIO.logInfo(s"gRPC server bound to ${config.host}:${config.port}")
+                 )(server =>
+                   ZIO.logInfo(s"gRPC server shutting down on ${config.host}:${config.port}") *>
+                     ZIO.attempt(server.shutdown()).unit.orDie
+                 )
     yield GrpcServerLive(server)
 
   private def buildServer[R](
@@ -65,7 +69,7 @@ object GrpcServer:
     services: Chunk[GrpcService[R]],
     runtime: Runtime[R],
   ): Chunk[ServerServiceDefinition] =
-    val endpoints            = services.flatMap(_.endpoints)
+    val endpoints            = services.flatMap(svc => svc.endpoints.map(_.withMiddleware(svc.middleware)))
     val descriptorsByService = services.flatMap(svc => svc.descriptor.map(d => serviceName(d.getFullName) -> d)).toMap
     val grouped              = endpoints.groupBy(endpoint => serviceName(endpoint.methodName))
 

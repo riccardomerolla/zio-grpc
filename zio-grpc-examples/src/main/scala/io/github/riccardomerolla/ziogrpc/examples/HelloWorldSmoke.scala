@@ -2,14 +2,18 @@ package io.github.riccardomerolla.ziogrpc.examples
 
 import java.nio.charset.StandardCharsets
 
-import zio.{ Chunk, Scope, ZIO, ZIOAppDefault }
+import zio.*
+import zio.logging.consoleLogger
 
 import io.github.riccardomerolla.ziogrpc.client.{ ChannelConfig, ClientError, GrpcChannel, GrpcClient, GrpcClientCall }
 import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcCodecError, GrpcErrorCodec, GrpcMetadata }
-import io.github.riccardomerolla.ziogrpc.server.{ GrpcEndpoint, GrpcHandler, GrpcService, ServerConfig, ZioGrpc }
+import io.github.riccardomerolla.ziogrpc.server.*
 import io.grpc.MethodDescriptor
 
 object HelloWorldSmoke extends ZIOAppDefault:
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.removeDefaultLoggers >>> consoleLogger()
+
   private given GrpcErrorCodec[HelloError]               = HelloError.codec
   private val helloRequestCodec: GrpcCodec[HelloRequest] = new GrpcCodec[HelloRequest]:
     override def encode(value: HelloRequest): Either[GrpcCodecError, Array[Byte]] =
@@ -57,15 +61,17 @@ object HelloWorldSmoke extends ZIOAppDefault:
     ZIO.scoped {
       for
         port    <- randomPort
-        _       <- ZIO.logInfo(s"Starting HelloWorld server on $port")
         server  <- ZioGrpc
-                     .server(ServerConfig("127.0.0.1", port), Chunk(GrpcService(Chunk(helloEndpoint))))
+                     .server(
+                       ServerConfig("127.0.0.1", port),
+                       Chunk(GrpcService(Chunk(helloEndpoint)).withMiddleware(LoggingMiddleware.default)),
+                     )
                      .mapError(error => new RuntimeException(error.toString))
         _       <- server.start.mapError(error => new RuntimeException(error.toString))
         channel <- GrpcChannel
                      .scoped(ChannelConfig(s"127.0.0.1:$port"))
                      .mapError(error => new RuntimeException(error.toString))
-        client   = GrpcClient(channel)
+        client   = GrpcClient(channel, logging = true)
         reply   <- client.unary(helloCall, HelloRequest("ZIO")).mapError {
                      case ClientError.Remote(err)     => new RuntimeException(err.toString)
                      case ClientError.Transport(code) => new RuntimeException(code.toString)

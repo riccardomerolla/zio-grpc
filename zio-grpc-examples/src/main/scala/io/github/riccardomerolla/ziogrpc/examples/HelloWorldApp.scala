@@ -2,10 +2,11 @@ package io.github.riccardomerolla.ziogrpc.examples
 
 import java.nio.charset.StandardCharsets
 
-import zio.{ Chunk, Scope, ZIO, ZIOAppArgs, ZIOAppDefault }
+import zio.*
+import zio.logging.consoleLogger
 
 import io.github.riccardomerolla.ziogrpc.core.{ GrpcCodec, GrpcCodecError, GrpcErrorCodec, GrpcMetadata }
-import io.github.riccardomerolla.ziogrpc.server.{ GrpcEndpoint, GrpcHandler, GrpcService, ServerConfig, ZioGrpc }
+import io.github.riccardomerolla.ziogrpc.server.*
 import io.grpc.{ MethodDescriptor, Status }
 
 enum HelloError:
@@ -29,6 +30,9 @@ final case class HelloRequest(name: String)
 final case class HelloReply(message: String)
 
 object HelloWorldApp extends ZIOAppDefault:
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.removeDefaultLoggers >>> consoleLogger()
+
   private val helloRequestCodec: GrpcCodec[HelloRequest] = new GrpcCodec[HelloRequest]:
     override def encode(value: HelloRequest): Either[GrpcCodecError, Array[Byte]] =
       Right(value.name.getBytes(StandardCharsets.UTF_8))
@@ -63,7 +67,7 @@ object HelloWorldApp extends ZIOAppDefault:
           errorCodec = HelloError.codec,
         )
       )
-    )
+    ).withMiddleware(LoggingMiddleware.default)
 
   override def run: ZIO[Environment & (ZIOAppArgs & Scope), Any, Any] =
     ZIO
@@ -71,12 +75,11 @@ object HelloWorldApp extends ZIOAppDefault:
         ZIO
           .acquireRelease(
             for
-              _      <- ZIO.logInfo("Starting HelloWorld gRPC server on 0.0.0.0:9000")
               server <- ZioGrpc.server(ServerConfig("0.0.0.0", 9000), Chunk(helloService))
               _      <- server.start
               _      <- ZIO.logInfo("Server started. Press Ctrl+C to stop.")
             yield server
-          )(server => server.shutdown *> ZIO.logInfo("Server stopped"))
+          )(_.shutdown)
           .flatMap(_ => ZIO.never)
       }
       .catchAllCause(_ => ZIO.unit)
